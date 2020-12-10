@@ -78,6 +78,10 @@ class MainWindow(QMainWindow, WindowMixin):
         super(MainWindow, self).__init__()
         self.setWindowTitle(__appname__)
 
+        self.current_zoom = 50
+        self.current_hbar_value = 0
+        self.current_vbar_value = 0
+
         # Load setting in the main thread
         self.settings = Settings()
         self.settings.load()
@@ -135,9 +139,16 @@ class MainWindow(QMainWindow, WindowMixin):
         self.editButton = QToolButton()
         self.editButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
+        # Create a widget for showing thermal image
+        self.thermalButton = QCheckBox(getStr('showThermal'))
+        self.thermalButton.setChecked(False)
+        #self.thermalButton.stateChanged.connect(self.btnstate)
+        self.thermalButton.stateChanged.connect(self.switch_rgb_ir)
+
         # Add some of widgets to listLayout
         listLayout.addWidget(self.editButton)
         listLayout.addWidget(self.diffcButton)
+        listLayout.addWidget(self.thermalButton)
         listLayout.addWidget(useDefaultLabelContainer)
 
         # Create and add combobox for showing unique labels in group
@@ -734,6 +745,7 @@ class MainWindow(QMainWindow, WindowMixin):
             item = self.labelList.item(self.labelList.count()-1)
 
         difficult = self.diffcButton.isChecked()
+        thermal = self.thermalButton.isChecked()
 
         try:
             shape = self.itemsToShapes[item]
@@ -748,6 +760,17 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
         except:
             pass
+
+        # try:
+        #     if thermal != shape.thermal:
+        #         shape.thermal = thermal
+        #         self.setDirty()
+        #         print("WÄH")
+        #     else:  # User probably changed item visibility
+        #         #self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
+        #         print("YES")
+        # except:
+        #     pass
 
     # React to canvas signals.
     def shapeSelectionChanged(self, selected=False):
@@ -817,6 +840,37 @@ class MainWindow(QMainWindow, WindowMixin):
             self.addLabel(shape)
         self.updateComboBox()
         self.canvas.loadShapes(s)
+
+    def loadLabels_switch(self, shapes):
+        s = []
+        for label, points, line_color, fill_color, difficult in shapes:
+            shape = Shape(label=label)
+            for x, y in points:
+
+                # Ensure the labels are within the bounds of the image. If not, fix them.
+                x, y, snapped = self.canvas.snapPointToCanvas(x, y)
+                if snapped:
+                    self.setDirty()
+
+                shape.addPoint(QPointF(x, y))
+            shape.difficult = difficult
+            shape.close()
+            s.append(shape)
+
+            if line_color:
+                shape.line_color = QColor(*line_color)
+            else:
+                shape.line_color = generateColorByText(label)
+
+            if fill_color:
+                shape.fill_color = QColor(*fill_color)
+            else:
+                shape.fill_color = generateColorByText(label)
+
+            #self.addLabel(shape)
+        self.updateComboBox()
+        self.canvas.loadShapes(s)
+
 
     def updateComboBox(self):
         # Get the unique labels and add them to the Combobox.
@@ -892,7 +946,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.canvas.selectShape(self.itemsToShapes[item])
             shape = self.itemsToShapes[item]
             # Add Chris
-            self.diffcButton.setChecked(shape.difficult)
+            self.diffcButton.setChecked(bool(int(shape.difficult)))
 
     def labelItemChanged(self, item):
         shape = self.itemsToShapes[item]
@@ -903,6 +957,24 @@ class MainWindow(QMainWindow, WindowMixin):
             self.setDirty()
         else:  # User probably changed item visibility
             self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
+
+    def switch_rgb_ir(self, item):
+        if self.thermalButton.isChecked():
+            ir_file_path = self.filePath.replace("rgb", "ir")
+            if ir_file_path:
+                self.loadFile_switch(ir_file_path, self.filePath)
+        else:
+            rgb_file_path = self.filePath.replace("ir", "rgb")
+            if rgb_file_path:
+                self.loadFile_switch(rgb_file_path, self.filePath)
+
+        self.setZoom(self.current_zoom)
+
+        h_bar = self.scrollBars[Qt.Horizontal]
+        v_bar = self.scrollBars[Qt.Vertical]
+
+        h_bar.setValue(int(self.current_hbar_value))
+        v_bar.setValue(int(self.current_vbar_value))
 
     # Callback functions:
     def newShape(self):
@@ -926,6 +998,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Add Chris
         self.diffcButton.setChecked(False)
+
         if text is not None:
             self.prevLabelText = text
             generate_color = generateColorByText(text)
@@ -949,7 +1022,16 @@ class MainWindow(QMainWindow, WindowMixin):
         bar = self.scrollBars[orientation]
         bar.setValue(bar.value() + bar.singleStep() * units)
 
+        h_bar = self.scrollBars[Qt.Horizontal]
+        v_bar = self.scrollBars[Qt.Vertical]
+        new_h_bar_value = h_bar.value()
+        new_v_bar_value = v_bar.value()
+
+        self.current_hbar_value = new_h_bar_value
+        self.current_vbar_value = new_v_bar_value
+
     def setZoom(self, value):
+        self.current_zoom = value
         self.actions.fitWidth.setChecked(False)
         self.actions.fitWindow.setChecked(False)
         self.zoomMode = self.MANUAL_ZOOM
@@ -1010,6 +1092,9 @@ class MainWindow(QMainWindow, WindowMixin):
         h_bar.setValue(new_h_bar_value)
         v_bar.setValue(new_v_bar_value)
 
+        self.current_hbar_value = new_h_bar_value
+        self.current_vbar_value = new_v_bar_value
+
     def setFitWindow(self, value=True):
         if value:
             self.actions.fitWidth.setChecked(False)
@@ -1025,6 +1110,98 @@ class MainWindow(QMainWindow, WindowMixin):
     def togglePolygons(self, value):
         for item, shape in self.itemsToShapes.items():
             item.setCheckState(Qt.Checked if value else Qt.Unchecked)
+
+    def loadFile_switch(self, filePath=None, rgb_path=None):
+        """Load the specified file, or the last opened file if None."""
+        #self.resetState()
+        self.canvas.setEnabled(False)
+        if filePath is None:
+            filePath = self.settings.get(SETTING_FILENAME)
+
+        # Make sure that filePath is a regular python string, rather than QString
+        filePath = ustr(filePath)
+
+        # Fix bug: An  index error after select a directory when open a new file.
+        unicodeFilePath = ustr(filePath)
+        unicodeFilePath = os.path.abspath(unicodeFilePath)
+
+        if unicodeFilePath and os.path.exists(unicodeFilePath):
+            # Load image:
+            # read data first and store for saving into label file.
+            self.imageData = read(unicodeFilePath, None)
+            self.canvas.verified = False
+
+            if isinstance(self.imageData, QImage):
+                image = self.imageData
+            else:
+                image = QImage.fromData(self.imageData)
+            if image.isNull():
+                self.errorMessage(u'Error opening file',
+                                  u"<p>Make sure <i>%s</i> is a valid image file." % unicodeFilePath)
+                self.status("Error reading %s" % unicodeFilePath)
+                return False
+            self.status("Loaded %s" % os.path.basename(unicodeFilePath))
+            self.image = image
+            self.canvas.loadPixmap(QPixmap.fromImage(image))
+            #self.canvas.setEnabled(True)
+            # self.adjustScale(initial=True)
+            # self.paintCanvas()
+            # self.addRecentFile(self.filePath)
+            # self.toggleActions(True)
+            #self.showBoundingBoxFromAnnotationFile(rgb_path)
+            #self.canvas.loadShapes(self.labelFile.shapes)
+
+            #self.setWindowTitle(__appname__ + ' ' + filePath)
+            #self.canvas.setFocus(True)
+
+
+
+        # Show Labels
+        if rgb_path is None:
+            rgb_path = self.settings.get(SETTING_FILENAME)
+
+        # Make sure that filePath is a regular python string, rather than QString
+        rgb_path = ustr(rgb_path)
+
+        # Fix bug: An  index error after select a directory when open a new file.
+        unicodeFilePath_rgb = ustr(rgb_path)
+        unicodeFilePath_rgb = os.path.abspath(unicodeFilePath_rgb)
+        if unicodeFilePath_rgb and os.path.exists(unicodeFilePath_rgb):
+            if LabelFile.isLabelFile(unicodeFilePath_rgb):
+                try:
+                    self.labelFile = LabelFile(unicodeFilePath_rgb)
+                except LabelFileError as e:
+                    self.errorMessage(u'Error opening file',
+                                      (u"<p><b>%s</b></p>"
+                                       u"<p>Make sure <i>%s</i> is a valid label file.")
+                                      % (e, unicodeFilePath_rgb))
+                    self.status("Error reading %s" % unicodeFilePath_rgb)
+                    return False
+
+            self.status("Loaded %s" % os.path.basename(unicodeFilePath_rgb))
+
+            # if self.labelFile:
+            #    self.loadLabels(self.labelFile.shapes)
+            # self.setClean()
+            self.canvas.setEnabled(True)
+            # self.adjustScale(initial=True)
+            #self.paintCanvas()
+            # self.addRecentFile(self.filePath)
+            # self.toggleActions(True)
+            self.showBoundingBoxFromAnnotationFile_switch(rgb_path)
+            # self.canvas.loadShapes(self.labelFile.shapes)
+
+            self.setWindowTitle(__appname__ + ' ' + filePath)
+
+            # Default : select last item if there is at least one item
+            # if self.labelList.count():
+            #     self.labelList.setCurrentItem(self.labelList.item(self.labelList.count()-1))
+            #     self.labelList.item(self.labelList.count()-1).setSelected(True)
+
+            self.canvas.setFocus(True)
+            return True
+
+        return False
 
     def loadFile(self, filePath=None):
         """Load the specified file, or the last opened file if None."""
@@ -1105,6 +1282,20 @@ class MainWindow(QMainWindow, WindowMixin):
             self.canvas.setFocus(True)
             return True
         return False
+
+    def showBoundingBoxFromAnnotationFile_switch(self, filePath):
+        if self.defaultSaveDir is not None:
+            basename = os.path.basename(os.path.splitext(filePath)[0])
+            txtPath = os.path.join(self.defaultSaveDir, basename + TXT_EXT)
+
+            if os.path.isfile(txtPath):
+                self.loadYOLOTXTByFilename_switch(txtPath)
+        else:
+            txtPath = os.path.splitext(filePath)[0] + TXT_EXT
+            if os.path.isfile(txtPath):
+                self.loadYOLOTXTByFilename_switch(txtPath)
+
+
 
     def showBoundingBoxFromAnnotationFile(self, filePath):
         if self.defaultSaveDir is not None:
@@ -1268,6 +1459,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.importDirImages(targetDirPath)
 
     def importDirImages(self, dirpath):
+        #print(dirpath)
+        self.loadProjectClasses(dirpath + "/classes.txt")
         if not self.mayContinue() or not dirpath:
             return
 
@@ -1324,6 +1517,15 @@ class MainWindow(QMainWindow, WindowMixin):
             if filename:
                 self.loadFile(filename)
 
+        self.setZoom(self.current_zoom)
+
+        h_bar = self.scrollBars[Qt.Horizontal]
+        v_bar = self.scrollBars[Qt.Vertical]
+
+        h_bar.setValue(int(self.current_hbar_value))
+        v_bar.setValue(int(self.current_vbar_value))
+
+
     def openNextImg(self, _value=False):
         # Proceding prev image without dialog if having any label
         if self.autoSaving.isChecked():
@@ -1350,6 +1552,14 @@ class MainWindow(QMainWindow, WindowMixin):
 
         if filename:
             self.loadFile(filename)
+
+        self.setZoom(self.current_zoom)
+
+        h_bar = self.scrollBars[Qt.Horizontal]
+        v_bar = self.scrollBars[Qt.Vertical]
+
+        h_bar.setValue(int(self.current_hbar_value))
+        v_bar.setValue(int(self.current_vbar_value))
 
     def openFile(self, _value=False):
         if not self.mayContinue():
@@ -1506,6 +1716,14 @@ class MainWindow(QMainWindow, WindowMixin):
                     else:
                         self.labelHist.append(line)
 
+    def loadProjectClasses(self, classesFile):
+        if os.path.exists(classesFile) is True:
+            self.labelHist = []
+            with codecs.open(classesFile, 'r', 'utf8') as f:
+                for line in f:
+                    line = line.strip()
+                    self.labelHist.append(line)
+
     def loadPascalXMLByFilename(self, xmlPath):
         if self.filePath is None:
             return
@@ -1518,6 +1736,18 @@ class MainWindow(QMainWindow, WindowMixin):
         shapes = tVocParseReader.getShapes()
         self.loadLabels(shapes)
         self.canvas.verified = tVocParseReader.verified
+
+    def loadYOLOTXTByFilename_switch(self, txtPath):
+        if self.filePath is None:
+            return
+        if os.path.isfile(txtPath) is False:
+            return
+
+        self.set_format(FORMAT_YOLO)
+        tYoloParseReader = YoloReader(txtPath, self.image)
+        shapes = tYoloParseReader.getShapes()
+        self.loadLabels_switch(shapes)
+        self.canvas.verified = tYoloParseReader.verified
 
     def loadYOLOTXTByFilename(self, txtPath):
         if self.filePath is None:
