@@ -52,6 +52,11 @@ from libs.hashableQListWidgetItem import HashableQListWidgetItem
 __appname__ = 'labelImg'
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 class WindowMixin(object):
 
     def menu(self, title, actions=None):
@@ -71,6 +76,11 @@ class WindowMixin(object):
         return toolbar
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
 
@@ -816,7 +826,6 @@ class MainWindow(QMainWindow, WindowMixin):
         for label, points, line_color, fill_color, difficult in shapes:
             shape = Shape(label=label)
             for x, y in points:
-
                 # Ensure the labels are within the bounds of the image. If not, fix them.
                 x, y, snapped = self.canvas.snapPointToCanvas(x, y)
                 if snapped:
@@ -1295,8 +1304,6 @@ class MainWindow(QMainWindow, WindowMixin):
             if os.path.isfile(txtPath):
                 self.loadYOLOTXTByFilename_switch(txtPath)
 
-
-
     def showBoundingBoxFromAnnotationFile(self, filePath):
         if self.defaultSaveDir is not None:
             basename = os.path.basename(os.path.splitext(filePath)[0])
@@ -1605,7 +1612,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if dlg.exec_():
             fullFilePath = ustr(dlg.selectedFiles()[0])
             if removeExt:
-                return os.path.splitext(fullFilePath)[0] # Return file path without the extension.
+                # Return file path without the extension.
+                return os.path.splitext(fullFilePath)[0]
             else:
                 return fullFilePath
         return ''
@@ -1658,15 +1666,13 @@ class MainWindow(QMainWindow, WindowMixin):
         return QMessageBox.warning(self, u'Attention', msg, yes | no | cancel)
 
     def errorMessage(self, title, message):
-        return QMessageBox.critical(self, title,
-                                    '<p><b>%s</b></p>%s' % (title, message))
+        return QMessageBox.critical(self, title, '<p><b>%s</b></p>%s' % (title, message))
 
     def currentPath(self):
         return os.path.dirname(self.filePath) if self.filePath else '.'
 
     def chooseColor1(self):
-        color = self.colorDialog.getColor(self.lineColor, u'Choose line color',
-                                          default=DEFAULT_LINE_COLOR)
+        color = self.colorDialog.getColor(self.lineColor, u'Choose line color', default=DEFAULT_LINE_COLOR)
         if color:
             self.lineColor = color
             Shape.line_color = color
@@ -1682,16 +1688,14 @@ class MainWindow(QMainWindow, WindowMixin):
                 action.setEnabled(False)
 
     def chshapeLineColor(self):
-        color = self.colorDialog.getColor(self.lineColor, u'Choose line color',
-                                          default=DEFAULT_LINE_COLOR)
+        color = self.colorDialog.getColor(self.lineColor, u'Choose line color', default=DEFAULT_LINE_COLOR)
         if color:
             self.canvas.selectedShape.line_color = color
             self.canvas.update()
             self.setDirty()
 
     def chshapeFillColor(self):
-        color = self.colorDialog.getColor(self.fillColor, u'Choose fill color',
-                                          default=DEFAULT_FILL_COLOR)
+        color = self.colorDialog.getColor(self.fillColor, u'Choose fill color', default=DEFAULT_FILL_COLOR)
         if color:
             self.canvas.selectedShape.fill_color = color
             self.canvas.update()
@@ -1789,10 +1793,21 @@ class MainWindow(QMainWindow, WindowMixin):
     def toogleDrawSquare(self):
         self.canvas.setDrawingShapeToSquare(self.drawSquaresOption.isChecked())
 
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def inverted(color):
     return QColor(*[255 - v for v in color.getRgb()])
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def read(filename, default=None):
     try:
         reader = QImageReader(filename)
@@ -1802,6 +1817,11 @@ def read(filename, default=None):
         return default
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def get_main_app(argv=[]):
     """
     Standard boilerplate Qt application code.
@@ -1825,7 +1845,11 @@ def get_main_app(argv=[]):
     win.show()
     return app, win
 
-
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def main():
     '''construct main app and run it'''
     app, _win = get_main_app(sys.argv)

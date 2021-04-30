@@ -40,6 +40,8 @@ class YOLOWriter:
         w = float((xmax - xmin)) / self.imgSize[1]
         h = float((ymax - ymin)) / self.imgSize[0]
 
+        print(str(xcen) + ", " + str(ycen) + ", " + str(w) + ", " + str(h))
+
         # PR387
         boxName = box['name']
         if boxName not in classList:
@@ -129,10 +131,10 @@ class YoloReader:
         ymin = max(float(ycen) - float(h) / 2, 0)
         ymax = min(float(ycen) + float(h) / 2, 1)
 
-        xmin = int(self.imgSize[1] * xmin)
-        xmax = int(self.imgSize[1] * xmax)
-        ymin = int(self.imgSize[0] * ymin)
-        ymax = int(self.imgSize[0] * ymax)
+        xmin = int(round(self.imgSize[1] * xmin))
+        xmax = int(round(self.imgSize[1] * xmax))
+        ymin = int(round(self.imgSize[0] * ymin))
+        ymax = int(round(self.imgSize[0] * ymax))
 
         return label, xmin, ymin, xmax, ymax
 
@@ -140,6 +142,7 @@ class YoloReader:
         bndBoxFile = open(self.filepath, 'r')
         for bndBox in bndBoxFile:
             classIndex, xcen, ycen, w, h, diff = bndBox.strip().split(' ')
+            print(str(xcen) + ", " + str(ycen) + ", " + str(w) + ", " + str(h))
             label, xmin, ymin, xmax, ymax = self.yoloLine2Shape(classIndex, xcen, ycen, w, h)
 
             # Caveat: difficult flag is discarded when saved as yolo format.
